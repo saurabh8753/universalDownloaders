@@ -8,143 +8,91 @@ async function fetchPinterestMedia(url) {
     const { data } = await axios.get(url, {
       headers: {
         "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36",
-      },
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36"
+      }
     });
 
     const $ = cheerio.load(data);
 
     const title =
-      $('meta[property="og:title"]').attr("content") || "Pinterest Media";
+      $('meta[property="og:title"]').attr("content") ||
+      "Pinterest Media";
 
     const thumbnail =
-      $('meta[property="og:image"]').attr("content") || "";
+      $('meta[property="og:image"]').attr("content");
 
     const downloads = [];
 
-    let jsonData = null;
+    // VIDEO DETECTION
+    $("video source").each((i, el) => {
 
-    // Extract Pinterest JSON data
-    $("script").each((i, el) => {
-      const text = $(el).html();
+      const src = $(el).attr("src");
 
-      if (text && text.includes("__PWS_DATA__")) {
-        try {
-          const match = text.match(/__PWS_DATA__\s*=\s*(\{.*\});/s);
-          if (match) {
-            jsonData = JSON.parse(match[1]);
-          }
-        } catch {}
-      }
-    });
-
-    if (!jsonData) {
-      return {
-        title,
-        thumbnail,
-        downloads: [
-          {
-            quality: "Image",
-            format: "JPG",
-            url: thumbnail,
-          },
-        ],
-      };
-    }
-
-    const resources = jsonData?.props?.initialReduxState?.pins;
-
-    if (!resources) {
-      return {
-        title,
-        thumbnail,
-        downloads: [
-          {
-            quality: "Image",
-            format: "JPG",
-            url: thumbnail,
-          },
-        ],
-      };
-    }
-
-    Object.values(resources).forEach((pin) => {
-
-      // VIDEO PIN
-      if (pin?.videos?.video_list) {
-
-        Object.values(pin.videos.video_list).forEach((v) => {
-
-          downloads.push({
-            quality: v.width + "x" + v.height,
-            format: "MP4",
-            url: v.url,
-          });
-
-        });
-
-      }
-
-      // GIF PIN
-      if (pin?.images?.orig?.url && pin.images.orig.url.endsWith(".gif")) {
+      if (src && src.includes(".mp4")) {
 
         downloads.push({
-          quality: "Original GIF",
-          format: "GIF",
-          url: pin.images.orig.url,
-        });
-
-      }
-
-      // IMAGE PIN (Original + sizes)
-      if (pin?.images) {
-
-        Object.values(pin.images).forEach((img) => {
-
-          if (img.url) {
-
-            downloads.push({
-              quality: img.width + "x" + img.height,
-              format: "JPG",
-              url: img.url,
-            });
-
-          }
-
-        });
-
-      }
-
-      // CAROUSEL PINS
-      if (pin?.carousel_data?.blocks) {
-
-        pin.carousel_data.blocks.forEach((block) => {
-
-          const img = block?.image?.images?.orig?.url;
-
-          if (img) {
-
-            downloads.push({
-              quality: "Carousel Image",
-              format: "JPG",
-              url: img,
-            });
-
-          }
-
+          quality: "HD",
+          format: "MP4",
+          url: src
         });
 
       }
 
     });
+
+
+    // GIF DETECT
+    if (thumbnail && thumbnail.endsWith(".gif")) {
+
+      downloads.push({
+        quality: "GIF",
+        format: "GIF",
+        url: thumbnail
+      });
+
+    }
+
+
+    // IMAGE SIZES (Original)
+    if (thumbnail) {
+
+      const original = thumbnail.replace("/736x/", "/originals/");
+
+      downloads.push({
+        quality: "Original",
+        format: "JPG",
+        url: original
+      });
+
+      downloads.push({
+        quality: "736px",
+        format: "JPG",
+        url: thumbnail
+      });
+
+    }
+
+
+    // IF NOTHING FOUND
+    if (downloads.length === 0 && thumbnail) {
+
+      downloads.push({
+        quality: "Image",
+        format: "JPG",
+        url: thumbnail
+      });
+
+    }
 
     return {
       title,
       thumbnail,
-      downloads,
+      downloads
     };
 
-  } catch (err) {
+  }
+
+  catch (error) {
 
     throw new Error("Pinterest extraction failed");
 
