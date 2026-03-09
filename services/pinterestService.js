@@ -3,73 +3,83 @@ const cheerio = require("cheerio");
 
 async function fetchPinterestMedia(url) {
 
-  const encodedUrl = encodeURIComponent(url);
-
-  const requestUrl =
-    `https://www.savepin.app/download.php?url=${encodedUrl}&lang=en&type=redirect`;
-
   try {
 
-    const response = await axios.get(requestUrl, {
+    const { data } = await axios.get(url, {
       headers: {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-        Referer: "https://www.savepin.app/"
-      }
+      },
     });
 
-    const $ = cheerio.load(response.data);
+    const $ = cheerio.load(data);
 
-    const title = $("h1").first().text().trim();
+    const title =
+      $('meta[property="og:title"]').attr("content") ||
+      $("title").text();
 
     const thumbnail =
-      $(".image-container img").attr("src") ||
-      $("meta[property='og:image']").attr("content");
+      $('meta[property="og:image"]').attr("content");
 
     const downloads = [];
 
-    $("tbody tr").each((i, el) => {
+    // Extract script JSON data
+    const scripts = $("script");
 
-      const quality = $(el).find(".video-quality").text().trim();
+    scripts.each((i, el) => {
 
-      const format = $(el).find("td:nth-child(2)").text().trim();
+      const text = $(el).html();
 
-      const href = $(el).find("a").attr("href");
+      if (text && text.includes("video_list")) {
 
-      if (!href) return;
+        try {
 
-      const match = href.match(/url=(.*)/);
+          const jsonMatch = text.match(/\{.*"video_list".*\}/s);
 
-      const directUrl = match ? decodeURIComponent(match[1]) : null;
+          if (!jsonMatch) return;
 
-      if (directUrl) {
+          const json = JSON.parse(jsonMatch[0]);
 
-        downloads.push({
-          quality: quality || "Default",
-          format: format || "MP4",
-          url: directUrl
-        });
+          const videos = json.video_list;
+
+          Object.keys(videos).forEach((key) => {
+
+            downloads.push({
+              quality: key,
+              format: "MP4",
+              url: videos[key].url,
+            });
+
+          });
+
+        } catch (e) {}
 
       }
 
     });
 
-    if (downloads.length === 0) {
-      throw new Error("No downloadable media found.");
+    // Image extraction
+    if (downloads.length === 0 && thumbnail) {
+
+      downloads.push({
+        quality: "Original",
+        format: "JPG",
+        url: thumbnail,
+      });
+
     }
 
     return {
       title,
       thumbnail,
-      downloads
+      downloads,
     };
 
-  } catch (err) {
+  } catch (error) {
 
     throw new Error("Pinterest extraction failed");
 
   }
-
 }
 
 module.exports = { fetchPinterestMedia };
