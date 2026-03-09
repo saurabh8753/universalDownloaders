@@ -2,16 +2,12 @@ const express = require("express");
 const router = express.Router();
 const axios = require("axios");
 
-const {
-  handlePinterestDownload,
-} = require("../controllers/pinterestController");
+const { handlePinterestDownload } = require("../controllers/pinterestController");
 
-
-// MAIN API
 router.get("/download", handlePinterestDownload);
 
 
-// FORCE DOWNLOAD PROXY
+// FORCE DOWNLOAD ROUTE
 router.get("/file", async (req, res) => {
 
   try {
@@ -19,16 +15,14 @@ router.get("/file", async (req, res) => {
     const { url } = req.query;
 
     if (!url) {
-
       return res.status(400).json({
         success:false,
         error:"Missing url parameter"
       });
-
     }
 
-    const response = await axios.get(url,{
-      responseType:"stream"
+    const response = await axios.get(url, {
+      responseType: "stream"
     });
 
     const fileName = url.split("/").pop().split("?")[0];
