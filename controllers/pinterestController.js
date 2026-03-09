@@ -1,15 +1,9 @@
 const { fetchPinterestMedia } = require("../services/pinterestService");
 const axios = require("axios");
 
-// Purana function: Links fetch karne ke liye
 async function handlePinterestDownload(req, res) {
   const { url } = req.query;
-  if (!url) {
-    return res
-      .status(400)
-      .json({ success: false, error: "Missing 'url' query parameter." });
-  }
-
+  if (!url) return res.status(400).json({ success: false, error: "URL missing" });
   try {
     const data = await fetchPinterestMedia(url);
     res.json({ success: true, data });
@@ -18,36 +12,35 @@ async function handlePinterestDownload(req, res) {
   }
 }
 
-// Naya function: File ko FORCE download karwane ke liye
 async function handleProxyDownload(req, res) {
   const { url } = req.query;
-  if (!url) {
-    return res.status(400).send("URL is required");
-  }
+  if (!url) return res.status(400).send("URL is required");
 
   try {
     const response = await axios({
       method: "get",
       url: url,
-      responseType: "stream",
+      responseType: "arraybuffer", // Vercel stability ke liye
       headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
       },
     });
 
-    const contentType = response.headers["content-type"];
+    const timestamp = Date.now();
+    const contentType = response.headers["content-type"] || "video/mp4";
     const extension = contentType.includes("video") ? "mp4" : "jpg";
-    const filename = `pinterest_${Date.now()}.${extension}`;
+    const filename = `pin_download_${timestamp}.${extension}`;
 
-    // Ye headers browser ko majboor karenge file save karne ke liye
-    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-    res.setHeader("Content-Type", contentType);
+    // FORCE DOWNLOAD HEADERS
+    res.setHeader('Content-Type', 'application/octet-stream'); // Browser player ko bypass karne ke liye
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', response.data.length);
+    res.setHeader('Cache-Control', 'no-cache');
 
-    // File stream ko client (browser) ki taraf bhej rahe hain
-    response.data.pipe(res);
+    res.send(Buffer.from(response.data));
   } catch (err) {
-    console.error("Proxy Error:", err.message);
-    res.status(500).send("Could not download file.");
+    console.error("Download Error:", err.message);
+    res.status(500).send("Server Error: Download failed.");
   }
 }
 
