@@ -1,70 +1,74 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
 
-async function fetchPinterestMedia(url) {
+async function fetchPinterestMedia(url){
 
-  try {
+const {data}=await axios.get(url,{
+headers:{
+"User-Agent":
+"Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36"
+}
+})
 
-    const response = await axios.get(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36"
-      },
-      timeout: 10000
-    });
+const $=cheerio.load(data)
 
-    const html = response.data;
+const title=$('meta[property="og:title"]').attr("content") || ""
 
-    const $ = cheerio.load(html);
+const thumbnail=$('meta[property="og:image"]').attr("content") || ""
 
-    const title =
-      $('meta[property="og:title"]').attr("content") || "Pinterest Media";
+const downloads=[]
 
-    const thumbnail =
-      $('meta[property="og:image"]').attr("content");
 
-    const downloads = [];
+// FIND VIDEO FROM JSON
 
-    $("video source").each((i, el) => {
+$("script").each((i,el)=>{
 
-      const src = $(el).attr("src");
+const script=$(el).html()
 
-      if (src) {
+if(script && script.includes("video_list")){
 
-        downloads.push({
-          quality: "HD",
-          format: "MP4",
-          url: src
-        });
+try{
 
-      }
+const match=script.match(/"video_list":({.*?})/)
 
-    });
+if(!match) return
 
-    if (downloads.length === 0 && thumbnail) {
+const json=JSON.parse(match[1])
 
-      downloads.push({
-        quality: "Image",
-        format: "JPG",
-        url: thumbnail
-      });
+Object.keys(json).forEach(key=>{
 
-    }
+downloads.push({
+quality:key,
+format:"MP4",
+url:json[key].url
+})
 
-    return {
-      title,
-      thumbnail,
-      downloads
-    };
+})
 
-  } catch (err) {
-
-    console.error(err);
-
-    throw new Error("Pinterest extraction failed");
-
-  }
+}catch{}
 
 }
 
-module.exports = { fetchPinterestMedia };
+})
+
+
+// IF NO VIDEO → IMAGE
+if(downloads.length===0 && thumbnail){
+
+downloads.push({
+quality:"Image",
+format:"JPG",
+url:thumbnail
+})
+
+}
+
+return{
+title,
+thumbnail,
+downloads
+}
+
+}
+
+module.exports={fetchPinterestMedia}
