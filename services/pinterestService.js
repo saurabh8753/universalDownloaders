@@ -3,83 +3,70 @@ const cheerio = require("cheerio");
 
 async function fetchPinterestMedia(url) {
 
-  try {
+  const { data } = await axios.get(url, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36",
+    },
+  });
 
-    const { data } = await axios.get(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
-      },
-    });
+  const $ = cheerio.load(data);
 
-    const $ = cheerio.load(data);
+  const title =
+    $('meta[property="og:title"]').attr("content") || "";
 
-    const title =
-      $('meta[property="og:title"]').attr("content") ||
-      $("title").text();
+  const thumbnail =
+    $('meta[property="og:image"]').attr("content") || "";
 
-    const thumbnail =
-      $('meta[property="og:image"]').attr("content");
+  const downloads = [];
 
-    const downloads = [];
+  // Extract JSON state
+  $("script").each((i, el) => {
 
-    // Extract script JSON data
-    const scripts = $("script");
+    const text = $(el).html();
 
-    scripts.each((i, el) => {
+    if (text && text.includes("video_list")) {
 
-      const text = $(el).html();
+      try {
 
-      if (text && text.includes("video_list")) {
+        const match = text.match(/"video_list":({.*?})/);
 
-        try {
+        if (!match) return;
 
-          const jsonMatch = text.match(/\{.*"video_list".*\}/s);
+        const json = JSON.parse(match[1]);
 
-          if (!jsonMatch) return;
+        Object.keys(json).forEach((key) => {
 
-          const json = JSON.parse(jsonMatch[0]);
-
-          const videos = json.video_list;
-
-          Object.keys(videos).forEach((key) => {
-
-            downloads.push({
-              quality: key,
-              format: "MP4",
-              url: videos[key].url,
-            });
-
+          downloads.push({
+            quality: key,
+            format: "MP4",
+            url: json[key].url,
           });
 
-        } catch (e) {}
+        });
 
-      }
-
-    });
-
-    // Image extraction
-    if (downloads.length === 0 && thumbnail) {
-
-      downloads.push({
-        quality: "Original",
-        format: "JPG",
-        url: thumbnail,
-      });
+      } catch {}
 
     }
 
-    return {
-      title,
-      thumbnail,
-      downloads,
-    };
+  });
 
-  } catch (error) {
+  // fallback image
+  if (downloads.length === 0 && thumbnail) {
 
-    throw new Error("Pinterest extraction failed");
+    downloads.push({
+      quality: "Image",
+      format: "JPG",
+      url: thumbnail,
+    });
 
   }
+
+  return {
+    title,
+    thumbnail,
+    downloads,
+  };
 }
 
 module.exports = { fetchPinterestMedia };
