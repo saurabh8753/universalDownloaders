@@ -1,103 +1,55 @@
+const express = require("express");
+const router = express.Router();
 const axios = require("axios");
-const cheerio = require("cheerio");
 
-async function fetchPinterestMedia(url) {
+const { handlePinterestDownload } = require("../controllers/pinterestController");
+
+router.get("/download", handlePinterestDownload);
+
+
+// FORCE DOWNLOAD ROUTE
+router.get("/file", async (req, res) => {
 
   try {
 
-    const { data } = await axios.get(url, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36"
-      }
+    const { url } = req.query;
+
+    if (!url) {
+      return res.status(400).json({
+        success:false,
+        error:"Missing url parameter"
+      });
+    }
+
+    const response = await axios.get(url, {
+      responseType: "stream"
     });
 
-    const $ = cheerio.load(data);
+    const fileName = url.split("/").pop().split("?")[0];
 
-    const title =
-      $('meta[property="og:title"]').attr("content") ||
-      "Pinterest Media";
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${fileName}"`
+    );
 
-    const thumbnail =
-      $('meta[property="og:image"]').attr("content");
+    res.setHeader(
+      "Content-Type",
+      response.headers["content-type"]
+    );
 
-    const downloads = [];
-
-    // VIDEO DETECTION
-    $("video source").each((i, el) => {
-
-      const src = $(el).attr("src");
-
-      if (src && src.includes(".mp4")) {
-
-        downloads.push({
-          quality: "HD",
-          format: "MP4",
-          url: src
-        });
-
-      }
-
-    });
-
-
-    // GIF DETECT
-    if (thumbnail && thumbnail.endsWith(".gif")) {
-
-      downloads.push({
-        quality: "GIF",
-        format: "GIF",
-        url: thumbnail
-      });
-
-    }
-
-
-    // IMAGE SIZES (Original)
-    if (thumbnail) {
-
-      const original = thumbnail.replace("/736x/", "/originals/");
-
-      downloads.push({
-        quality: "Original",
-        format: "JPG",
-        url: original
-      });
-
-      downloads.push({
-        quality: "736px",
-        format: "JPG",
-        url: thumbnail
-      });
-
-    }
-
-
-    // IF NOTHING FOUND
-    if (downloads.length === 0 && thumbnail) {
-
-      downloads.push({
-        quality: "Image",
-        format: "JPG",
-        url: thumbnail
-      });
-
-    }
-
-    return {
-      title,
-      thumbnail,
-      downloads
-    };
+    response.data.pipe(res);
 
   }
 
-  catch (error) {
+  catch(err){
 
-    throw new Error("Pinterest extraction failed");
+    res.status(500).json({
+      success:false,
+      error:"Download failed"
+    });
 
   }
 
-}
+});
 
-module.exports = { fetchPinterestMedia };
+module.exports = router;
