@@ -1,55 +1,84 @@
-const express = require("express");
-const router = express.Router();
 const axios = require("axios");
+const cheerio = require("cheerio");
 
-const { handlePinterestDownload } = require("../controllers/pinterestController");
+async function fetchPinterestMedia(url) {
 
-router.get("/download", handlePinterestDownload);
+  const encodedUrl = encodeURIComponent(url);
 
-
-// FORCE DOWNLOAD ROUTE
-router.get("/file", async (req, res) => {
+  const fullUrl =
+    `https://www.savepin.app/download.php?url=${encodedUrl}&lang=en&type=redirect`;
 
   try {
 
-    const { url } = req.query;
+    const response = await axios.get(fullUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36",
+        Referer: "https://www.savepin.app/"
+      }
+    });
 
-    if (!url) {
-      return res.status(400).json({
-        success:false,
-        error:"Missing url parameter"
+    const $ = cheerio.load(response.data);
+
+    const title = $("h1").first().text().trim();
+
+    const thumbnail =
+      $(".image-container img").attr("src") ||
+      $("meta[property='og:image']").attr("content");
+
+    const downloads = [];
+
+    $("tbody tr").each((_, el) => {
+
+      const quality = $(el).find(".video-quality").text().trim();
+
+      const format = $(el).find("td:nth-child(2)").text().trim();
+
+      const href = $(el).find("a").attr("href");
+
+      if (!href) return;
+
+      const match = href.match(/url=(.*)/);
+
+      const directUrl = match ? decodeURIComponent(match[1]) : null;
+
+      if (directUrl) {
+
+        downloads.push({
+          quality: quality || "Default",
+          format: format || "MP4",
+          url: directUrl
+        });
+
+      }
+
+    });
+
+    // fallback image
+    if (downloads.length === 0 && thumbnail) {
+
+      downloads.push({
+        quality: "Image",
+        format: "JPG",
+        url: thumbnail
       });
+
     }
 
-    const response = await axios.get(url, {
-      responseType: "stream"
-    });
-
-    const fileName = url.split("/").pop().split("?")[0];
-
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="${fileName}"`
-    );
-
-    res.setHeader(
-      "Content-Type",
-      response.headers["content-type"]
-    );
-
-    response.data.pipe(res);
+    return {
+      title,
+      thumbnail,
+      downloads
+    };
 
   }
 
-  catch(err){
+  catch (error) {
 
-    res.status(500).json({
-      success:false,
-      error:"Download failed"
-    });
+    throw new Error("Failed to scrape Pinterest media");
 
   }
 
-});
+}
 
-module.exports = router;
+module.exports = { fetchPinterestMedia };
