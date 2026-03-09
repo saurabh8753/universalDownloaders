@@ -2,55 +2,74 @@ const axios = require("axios");
 const cheerio = require("cheerio");
 
 async function fetchPinterestMedia(url) {
+
   const encodedUrl = encodeURIComponent(url);
-  const fullUrl = `https://www.savepin.app/download.php?url=${encodedUrl}&lang=en&type=redirect`;
+
+  const requestUrl =
+    `https://www.savepin.app/download.php?url=${encodedUrl}&lang=en&type=redirect`;
 
   try {
-    const response = await axios.get(fullUrl, {
+
+    const response = await axios.get(requestUrl, {
       headers: {
-        accept:
-          "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-        "accept-language": "en-US,en;q=0.9",
-        "sec-ch-ua": '"Not)A;Brand";v="8", "Chromium";v="138", "Brave";v="138"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"Windows"',
-        "sec-fetch-dest": "document",
-        "sec-fetch-mode": "navigate",
-        "sec-fetch-site": "same-origin",
-        "sec-fetch-user": "?1",
-        "upgrade-insecure-requests": "1",
-        Referer: "https://www.savepin.app/",
-      },
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36",
+        Referer: "https://www.savepin.app/"
+      }
     });
 
     const $ = cheerio.load(response.data);
+
     const title = $("h1").first().text().trim();
-    const thumbnail = $(".image-container img").attr("src");
-    const results = [];
 
-    $("tbody tr").each((_, el) => {
+    const thumbnail =
+      $(".image-container img").attr("src") ||
+      $("meta[property='og:image']").attr("content");
+
+    const downloads = [];
+
+    $("tbody tr").each((i, el) => {
+
       const quality = $(el).find(".video-quality").text().trim();
-      const format = $(el).find("td:nth-child(2)").text().trim();
-      const href = $(el).find("a").attr("href");
-      const directUrl = decodeURIComponent(href?.split("url=")[1] || "");
 
-      if (quality && format && directUrl) {
-        results.push({
-          quality,
-          format,
-          url: directUrl,
+      const format = $(el).find("td:nth-child(2)").text().trim();
+
+      const href = $(el).find("a").attr("href");
+
+      if (!href) return;
+
+      const match = href.match(/url=(.*)/);
+
+      const directUrl = match ? decodeURIComponent(match[1]) : null;
+
+      if (directUrl) {
+
+        downloads.push({
+          quality: quality || "Default",
+          format: format || "MP4",
+          url: directUrl
         });
+
       }
+
     });
+
+    if (downloads.length === 0) {
+      throw new Error("No downloadable media found.");
+    }
 
     return {
       title,
       thumbnail,
-      downloads: results,
+      downloads
     };
-  } catch (error) {
-    throw new Error("Failed to scrape Pinterest media: " + error.message);
+
+  } catch (err) {
+
+    throw new Error("Pinterest extraction failed");
+
   }
+
 }
 
 module.exports = { fetchPinterestMedia };
