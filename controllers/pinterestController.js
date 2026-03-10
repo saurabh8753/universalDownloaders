@@ -1,34 +1,39 @@
-const { fetchPinterestMedia } = require("../services/pinterestService");
+const { fetchPinterestMedia } =
+require("../services/pinterestService")
 
-async function handlePinterestDownload(req, res) {
+async function handlePinterestDownload(req,res){
 
-  const { url } = req.query;
+ const {url} = req.query
 
-  if (!url) {
-    return res.status(400).json({
-      success: false,
-      error: "Missing 'url' query parameter."
-    });
-  }
+ if(!url){
 
-  try {
+  return res.status(400).json({
+   success:false,
+   error:"Missing url parameter"
+  })
 
-    const data = await fetchPinterestMedia(url);
+ }
 
-    res.json({
-      success: true,
-      data
-    });
+ try{
 
-  } catch (err) {
+  const data = await fetchPinterestMedia(url)
 
-    res.status(500).json({
-      success: false,
-      error: err.message
-    });
+  res.json({
+   success:true,
+   data
+  })
 
-  }
+ }
+
+ catch(err){
+
+  res.status(500).json({
+   success:false,
+   error:err.message
+  })
+
+ }
 
 }
 
-module.exports = { handlePinterestDownload };
+module.exports = { handlePinterestDownload }
