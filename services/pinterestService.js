@@ -1,84 +1,26 @@
-const axios = require("axios");
-const cheerio = require("cheerio");
+const workerpool = require("workerpool")
+const cache = require("../utils/cache")
 
-async function fetchPinterestMedia(url) {
+const pool = workerpool.pool(
+ __dirname + "/../workers/pinterestWorker.js"
+)
 
-  const encodedUrl = encodeURIComponent(url);
+async function fetchPinterestMedia(url){
 
-  const fullUrl =
-    `https://www.savepin.app/download.php?url=${encodedUrl}&lang=en&type=redirect`;
+ const cached = cache.get(url)
 
-  try {
+ if(cached){
 
-    const response = await axios.get(fullUrl, {
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36",
-        Referer: "https://www.savepin.app/"
-      }
-    });
+  return cached
 
-    const $ = cheerio.load(response.data);
+ }
 
-    const title = $("h1").first().text().trim();
+ const result = await pool.exec("default",[url])
 
-    const thumbnail =
-      $(".image-container img").attr("src") ||
-      $("meta[property='og:image']").attr("content");
+ cache.set(url,result)
 
-    const downloads = [];
-
-    $("tbody tr").each((_, el) => {
-
-      const quality = $(el).find(".video-quality").text().trim();
-
-      const format = $(el).find("td:nth-child(2)").text().trim();
-
-      const href = $(el).find("a").attr("href");
-
-      if (!href) return;
-
-      const match = href.match(/url=(.*)/);
-
-      const directUrl = match ? decodeURIComponent(match[1]) : null;
-
-      if (directUrl) {
-
-        downloads.push({
-          quality: quality || "Default",
-          format: format || "MP4",
-          url: directUrl
-        });
-
-      }
-
-    });
-
-    // fallback image
-    if (downloads.length === 0 && thumbnail) {
-
-      downloads.push({
-        quality: "Image",
-        format: "JPG",
-        url: thumbnail
-      });
-
-    }
-
-    return {
-      title,
-      thumbnail,
-      downloads
-    };
-
-  }
-
-  catch (error) {
-
-    throw new Error("Failed to scrape Pinterest media");
-
-  }
+ return result
 
 }
 
-module.exports = { fetchPinterestMedia };
+module.exports = { fetchPinterestMedia }
