@@ -1,81 +1,84 @@
-const axios = require("axios")
-const cheerio = require("cheerio")
-const NodeCache = require("node-cache")
+const axios = require("axios");
+const cheerio = require("cheerio");
 
-const cache = new NodeCache({ stdTTL:3600 })
+async function fetchPinterestMedia(url) {
 
-async function fetchPinterestMedia(url){
+  const encodedUrl = encodeURIComponent(url);
 
- const cached = cache.get(url)
+  const fullUrl =
+    `https://www.savepin.app/download.php?url=${encodedUrl}&lang=en&type=redirect`;
 
- if(cached){
-  return cached
- }
+  try {
 
- const encodedUrl = encodeURIComponent(url)
+    const response = await axios.get(fullUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36",
+        Referer: "https://www.savepin.app/"
+      }
+    });
 
- const fullUrl =
- `https://www.savepin.app/download.php?url=${encodedUrl}&lang=en&type=redirect`
+    const $ = cheerio.load(response.data);
 
- const response = await axios.get(fullUrl,{
-  headers:{
-   "User-Agent":
-   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120 Safari/537.36",
-   Referer:"https://www.savepin.app/"
+    const title = $("h1").first().text().trim();
+
+    const thumbnail =
+      $(".image-container img").attr("src") ||
+      $("meta[property='og:image']").attr("content");
+
+    const downloads = [];
+
+    $("tbody tr").each((_, el) => {
+
+      const quality = $(el).find(".video-quality").text().trim();
+
+      const format = $(el).find("td:nth-child(2)").text().trim();
+
+      const href = $(el).find("a").attr("href");
+
+      if (!href) return;
+
+      const match = href.match(/url=(.*)/);
+
+      const directUrl = match ? decodeURIComponent(match[1]) : null;
+
+      if (directUrl) {
+
+        downloads.push({
+          quality: quality || "Default",
+          format: format || "MP4",
+          url: directUrl
+        });
+
+      }
+
+    });
+
+    // fallback image
+    if (downloads.length === 0 && thumbnail) {
+
+      downloads.push({
+        quality: "Image",
+        format: "JPG",
+        url: thumbnail
+      });
+
+    }
+
+    return {
+      title,
+      thumbnail,
+      downloads
+    };
+
   }
- })
 
- const $ = cheerio.load(response.data)
+  catch (error) {
 
- const title = $("h1").first().text().trim()
-
- const thumbnail = $(".image-container img").attr("src")
-
- const downloads = []
-
- $("tbody tr").each((_,el)=>{
-
-  const quality = $(el).find(".video-quality").text().trim()
-
-  const format = $(el).find("td:nth-child(2)").text().trim()
-
-  const href = $(el).find("a").attr("href")
-
-  const directUrl =
-  decodeURIComponent(href?.split("url=")[1] || "")
-
-  if(directUrl){
-
-   downloads.push({
-    quality:quality || "Default",
-    format:format || "MP4",
-    url:directUrl
-   })
+    throw new Error("Failed to scrape Pinterest media");
 
   }
-
- })
-
- if(downloads.length===0 && thumbnail){
-
-  downloads.push({
-   quality:"Image",
-   format:"JPG",
-   url:thumbnail
-  })
-
- }
-
- const result={
-  title,
-  thumbnail,
-  downloads
- }
-
- cache.set(url,result)
-
- return result
 
 }
 
-module.exports={fetchPinterestMedia}
+module.exports = { fetchPinterestMedia };
