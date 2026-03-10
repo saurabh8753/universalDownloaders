@@ -1,55 +1,55 @@
-const express = require("express")
-const router = express.Router()
+const express = require("express");
+const router = express.Router();
+const axios = require("axios");
 
-const axios = require("axios")
+const { handlePinterestDownload } = require("../controllers/pinterestController");
 
-const {
- handlePinterestDownload
-} = require("../controllers/pinterestController")
-
-router.get("/download",handlePinterestDownload)
+router.get("/download", handlePinterestDownload);
 
 
-// FORCE DOWNLOAD PROXY
+// FORCE DOWNLOAD ROUTE
+router.get("/file", async (req, res) => {
 
-router.get("/file", async(req,res)=>{
+  try {
 
- try{
+    const { url } = req.query;
 
-  const {url} = req.query
+    if (!url) {
+      return res.status(400).json({
+        success:false,
+        error:"Missing url parameter"
+      });
+    }
 
-  if(!url){
+    const response = await axios.get(url, {
+      responseType: "stream"
+    });
 
-   return res.status(400).send("Missing url")
+    const fileName = url.split("/").pop().split("?")[0];
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${fileName}"`
+    );
+
+    res.setHeader(
+      "Content-Type",
+      response.headers["content-type"]
+    );
+
+    response.data.pipe(res);
 
   }
 
-  const response = await axios.get(url,{
-   responseType:"stream"
-  })
+  catch(err){
 
-  const name = url.split("/").pop().split("?")[0]
+    res.status(500).json({
+      success:false,
+      error:"Download failed"
+    });
 
-  res.setHeader(
-  "Content-Disposition",
-  `attachment; filename="${name}"`
-  )
+  }
 
-  res.setHeader(
-  "Content-Type",
-  response.headers["content-type"]
-  )
+});
 
-  response.data.pipe(res)
-
- }
-
- catch{
-
-  res.status(500).send("Download failed")
-
- }
-
-})
-
-module.exports = router
+module.exports = router;
