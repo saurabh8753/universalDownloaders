@@ -1,23 +1,17 @@
-const fetch = require("node-fetch");
+// ❌ node-fetch use मत करो (Vercel में built-in fetch है)
 
-// 🔥 COOKIE POOL (env से लो)
-const cookies = [
-  process.env.IG_COOKIE_1,
-  process.env.IG_COOKIE_2
-];
-
-// random cookie
+// 🔥 DIRECT SESSION (already added)
 function getCookie(){
-  return cookies[Math.floor(Math.random()*cookies.length)];
+  return "sessionid=74567981697%3ACwQ0cGrHFmKPew%3A12%3AAYg53ltcW0vDeE40A7rCtWGQiYZC1lQA0_zcRS2bWg";
 }
 
-// fetch system
+// 🔥 SAFE FETCH
 async function fetchInstagram(url){
 
   const res = await fetch(url,{
     headers:{
       "user-agent":"Instagram 155.0.0.37.107 Android",
-      "cookie":getCookie()
+      "cookie": getCookie()
     }
   });
 
@@ -26,32 +20,32 @@ async function fetchInstagram(url){
   try{
     return JSON.parse(text);
   }catch{
-    throw new Error("Invalid Instagram response");
+    throw new Error("Instagram blocked / invalid response");
   }
 }
 
-// extract shortcode
+// 🔍 helpers
 function extractShortcode(url){
   const match = url.match(/instagram\.com\/(reel|p)\/([^\/]+)/);
   return match ? match[2] : null;
 }
 
-// extract username (story)
 function extractUsername(url){
   const match = url.match(/instagram\.com\/stories\/([^\/]+)/);
   return match ? match[1] : null;
 }
 
-// 🔥 MAIN SERVICE
+// 🚀 MAIN SERVICE
 async function facebookInsta(url){
 
+  if(!url) throw new Error("URL missing");
+
   // =======================
-  // 📲 INSTAGRAM STORY
+  // 📲 STORY
   // =======================
-  if(url.includes("instagram.com/stories/")){
+  if(url.includes("/stories/")){
 
     const username = extractUsername(url);
-
     if(!username) throw new Error("Invalid story URL");
 
     const api = `https://i.instagram.com/api/v1/feed/reels_media/?reel_ids=${username}`;
@@ -70,18 +64,17 @@ async function facebookInsta(url){
 
       return {
         type:"image",
-        url:item.image_versions2.candidates[0].url
+        url:item.image_versions2?.candidates?.[0]?.url
       };
     });
   }
 
   // =======================
-  // 🎬 INSTAGRAM POST / REEL
+  // 🎬 POST / REEL
   // =======================
   if(url.includes("instagram.com")){
 
     const shortcode = extractShortcode(url);
-
     if(!shortcode) throw new Error("Invalid Instagram URL");
 
     const api = `https://www.instagram.com/p/${shortcode}/?__a=1&__d=dis`;
@@ -92,7 +85,7 @@ async function facebookInsta(url){
 
     if(!media) throw new Error("Media not found");
 
-    // video
+    // 🎬 video
     if(media.is_video){
       return [{
         type:"video",
@@ -100,7 +93,7 @@ async function facebookInsta(url){
       }];
     }
 
-    // carousel
+    // 📦 carousel
     if(media.edge_sidecar_to_children){
       return media.edge_sidecar_to_children.edges.map(edge=>{
         const node = edge.node;
@@ -119,24 +112,15 @@ async function facebookInsta(url){
       });
     }
 
-    // image
+    // 📸 image
     return [{
       type:"image",
       url:media.display_url
     }];
   }
 
-  // =======================
-  // 📘 FACEBOOK (fallback)
-  // =======================
-  const snapsave = require("metadownloader");
-
-  try{
-    const result = await snapsave(url);
-    return result;
-  }catch(err){
-    throw new Error("Facebook fetch failed");
-  }
+  // ❌ unsupported
+  throw new Error("Unsupported URL");
 }
 
 module.exports = facebookInsta;
