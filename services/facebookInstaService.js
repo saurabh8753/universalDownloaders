@@ -1,26 +1,37 @@
-// ❌ node-fetch use मत करो (Vercel में built-in fetch है)
+// 🔥 FULL COOKIE (IMPORTANT)
+const COOKIE = `
+sessionid=74567981697%3ACwQ0cGrHFmKPew%3A12%3AAYg53ltcW0vDeE40A7rCtWGQiYZC1lQA0_zcRS2bWg;
+ds_user_id=74567981697;
+csrftoken=nOJIQChHG4T8ZLbT4KM0qQ;
+mid=abpxWQABAAGnOOvPaDblMNk7uurQ;
+`;
 
-// 🔥 DIRECT SESSION (already added)
-function getCookie(){
-  return "sessionid=74567981697%3ACwQ0cGrHFmKPew%3A12%3AAYg53ltcW0vDeE40A7rCtWGQiYZC1lQA0_zcRS2bWg";
-}
-
-// 🔥 SAFE FETCH
+// 🔥 FETCH SYSTEM (ANTI BLOCK)
 async function fetchInstagram(url){
 
   const res = await fetch(url,{
     headers:{
-      "user-agent":"Instagram 155.0.0.37.107 Android",
-      "cookie": getCookie()
+      "user-agent":
+        "Instagram 155.0.0.37.107 Android (30/11; 420dpi; 1080x1920; Xiaomi; Redmi; en_US)",
+
+      "cookie": COOKIE,
+      "accept": "*/*",
+      "accept-language": "en-US,en;q=0.9",
+      "x-ig-app-id": "936619743392459"
     }
   });
 
   const text = await res.text();
 
+  // ❌ Instagram block detection
+  if(text.includes("<!DOCTYPE html>")){
+    throw new Error("Instagram blocked (try new cookie)");
+  }
+
   try{
     return JSON.parse(text);
   }catch{
-    throw new Error("Instagram blocked / invalid response");
+    throw new Error("Invalid JSON response");
   }
 }
 
