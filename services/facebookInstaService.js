@@ -1,19 +1,14 @@
-// 🔥 FULL COOKIE (IMPORTANT)
-const COOKIE = `
-sessionid=74567981697%3ACwQ0cGrHFmKPew%3A12%3AAYg53ltcW0vDeE40A7rCtWGQiYZC1lQA0_zcRS2bWg;
-ds_user_id=74567981697;
-csrftoken=nOJIQChHG4T8ZLbT4KM0qQ;
-mid=abpxWQABAAGnOOvPaDblMNk7uurQ;
-`;
+// 🔥 SINGLE LINE COOKIE (IMPORTANT)
+const COOKIE = "sessionid=74567981697%3ACwQ0cGrHFmKPew%3A12%3AAYg53ltcW0vDeE40A7rCtWGQiYZC1lQA0_zcRS2bWg; ds_user_id=74567981697; csrftoken=nOJIQChHG4T8ZLbT4KM0qQ; mid=abpxWQABAAGnOOvPaDblMNk7uurQ;";
 
-// 🔥 FETCH SYSTEM (ANTI BLOCK)
+// 🔥 SAFE FETCH (ANTI BLOCK)
 async function fetchInstagram(url){
 
   const res = await fetch(url,{
     headers:{
       "user-agent":
         "Instagram 155.0.0.37.107 Android (30/11; 420dpi; 1080x1920; Xiaomi; Redmi; en_US)",
-
+      
       "cookie": COOKIE,
       "accept": "*/*",
       "accept-language": "en-US,en;q=0.9",
@@ -23,9 +18,9 @@ async function fetchInstagram(url){
 
   const text = await res.text();
 
-  // ❌ Instagram block detection
+  // ❌ अगर HTML आया → block
   if(text.includes("<!DOCTYPE html>")){
-    throw new Error("Instagram blocked (try new cookie)");
+    throw new Error("Instagram blocked (change cookie)");
   }
 
   try{
@@ -96,7 +91,7 @@ async function facebookInsta(url){
 
     if(!media) throw new Error("Media not found");
 
-    // 🎬 video
+    // 🎬 VIDEO
     if(media.is_video){
       return [{
         type:"video",
@@ -104,7 +99,7 @@ async function facebookInsta(url){
       }];
     }
 
-    // 📦 carousel
+    // 📦 CAROUSEL
     if(media.edge_sidecar_to_children){
       return media.edge_sidecar_to_children.edges.map(edge=>{
         const node = edge.node;
@@ -123,7 +118,7 @@ async function facebookInsta(url){
       });
     }
 
-    // 📸 image
+    // 📸 IMAGE
     return [{
       type:"image",
       url:media.display_url
